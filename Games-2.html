@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mini Crossy Road</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  body { margin: 0; background: #8fbf8f; font-family: system-ui, sans-serif; display:flex; flex-direction:column; align-items:center; }
+  canvas { background: linear-gradient(#cfe9cf, #a8d0a8); display:block; margin:10px 0; border:6px solid #3a6; image-rendering: pixelated; }
+  #hud { color:#123; display:flex; gap:12px; align-items:center; }
+  #restart { padding:8px 12px; border-radius:6px; border:0; background:#ff8c00; color:white; cursor:pointer; }
+  #info { font-size:14px; color:#043; }
+  @media (max-width:600px){ canvas{ width: 95vw; height: calc(95vw * 1.1667); } }
+</style>
+</head>
+<body>
+<h2 style="margin:12px 0 0 0">Mini Crossy Road</h2>
+<div id="hud">
+  <div id="score">Score: 0</div>
+  <div id="best">Best: 0</div>
+  <button id="restart">Restart</button>
+ 
+</div>
+<canvas id="game" width="480" height="560"></canvas>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const restartBtn = document.getElementById('restart');
+
+  // Grid settings
+  const TILE = 56;                     // tile size (pixel grid)
+  const COLS = Math.floor(canvas.width / TILE);  // columns (not strictly used)
+  const ROWS = Math.floor(canvas.height / TILE); // rows visible
+  const START_ROW = ROWS - 1;          // starting row for player
+
+  // Lanes layout: define each horizontal row behaviour (cars or safe)
+  // We'll make lanes from bottom to top. index 0 = bottom row.
+  // lane.type: 'safe' (grass) | 'road' (cars)
+  const lanes = [];
+  // create a repeating pattern: safe, road, road, safe, road, road, safe, ... upward
+  for (let r = 0; r < ROWS; r++) {
+    if (r % 3 === 0) lanes.push({ type: 'safe' });
+    else lanes.push({ type: 'road', speedBase: 1 + (r/10), dir: (r % 2 === 0) ? 1 : -1 });
+  }
+
+  // Player (grid-based position)
+  const player = { col: Math.floor((canvas.width/TILE)/2), row: START_ROW, size: TILE * 0.7 };
+  let score = 0;
+  let best = Number(localStorage.getItem('mini-crossy-best') || 0);
+  bestEl.textContent = 'Best: ' + best;
+  let gameOver = false;
+
+  // Cars array
+  let cars = [];
+
+  function reset() {
+    // reset player to bottom center
+    player.col = Math.floor((canvas.width/TILE)/2);
+    player.row = START_ROW;
+    score = 0;
+    gameOver = false;
+    cars = [];
+    lanes.forEach((lane, idx) => {
+      lane.spawnTimer = Math.random() * 120 + 40 + idx * 2;
+      lane.speed = (lane.type === 'road') ? lane.speedBase * 1.0 : 0;
+      lane.dir = lane.dir || ((idx % 2 === 0) ? 1 : -1);
+    });
+    scoreEl.textContent = 'Score: ' + score;
+  }
+
+  // spawn car in a lane index (row)
+  function spawnCar(laneIndex) {
+    const lane = lanes[laneIndex];
+    if (lane.type !== 'road') return;
+    const laneY = canvas.height - ((laneIndex + 1) * TILE) + (TILE - (TILE*0.6)) / 2;
+    const width = TILE * (1 + Math.random() * 1.2);
+    let x = (lane.dir > 0) ? -width - 10 : canvas.width + 10;
+    const speed = lane.speed + Math.random() * 1.2;
+    cars.push({ x, y: laneY, w: width, h: TILE*0.6, lane: laneIndex, speed, dir: lane.dir, color: randCarColor() });
+  }
+
+  function randCarColor() {
+    const choices = ['#d33', '#e85', '#2a7', '#39f', '#fd5', '#b64', '#b53'];
+    return choices[Math.floor(Math.random()*choices.length)];
+  }
+
+  // Input handling (keyboard)
+  const keys = {};
+  window.addEventListener('keydown', e => {
+    keys[e.key] = true;
+    if (e.key === 'r' || e.key === 'R') {
+      reset();
+    }
+  });
+  window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+  // Touch controls: tap areas
+  let touchStart = null;
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    touchStart = e.touches[0];
+  }, {passive:false});
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    const t = touchStart;
+    touchStart = null;
+    if (!t) return;
+    const x = t.clientX - canvas.getBoundingClientRect().left;
+    const y = t.clientY - canvas.getBoundingClientRect().top;
+    // divide canvas into 4 quadrants
+    if (x < canvas.width/3) moveLeft();
+    else if (x > canvas.width*2/3) moveRight();
+    else if (y < canvas.height/2) moveUp();
+    else moveDown();
+  }, {passive:false});
+
+  // Movement functions (grid steps)
+  function moveLeft(){ if (gameOver) return; if (player.col > 0) player.col--; }
+  function moveRight(){ if (gameOver) return; if (player.col < Math.floor(canvas.width / TILE) - 1) player.col++; }
+  function moveUp(){ if (gameOver) return; if (player.row > 0) { player.row--; score = Math.max(score, (START_ROW - player.row)); updateScore(); } }
+  function moveDown(){ if (gameOver) return; if (player.row < START_ROW) player.row++; }
+
+  // Score UI
+  function updateScore(){ scoreEl.textContent = 'Score: ' + score; }
+
+  // Collision detection AABB
+  function rectCollide(ax, ay, aw, ah, bx, by, bw, bh){
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+  }
+
+  // Game loop
+  let last = performance.now();
+  function loop(now) {
+    const dt = now - last;
+    last = now;
+    handleInput();
+    step(dt);
+    draw();
+    if (!gameOver) requestAnimationFrame(loop);
+  }
+
+  // input mapping from key presses
+  function handleInput(){
+    if (keys['ArrowLeft'] || keys['a'] || keys['A']) { if (!keyHandled.left){ moveLeft(); keyHandled.left = true; } }
+    else keyHandled.left = false;
+    if (keys['ArrowRight'] || keys['d'] || keys['D']) { if (!keyHandled.right){ moveRight(); keyHandled.right = true; } }
+    else keyHandled.right = false;
+    if (keys['ArrowUp'] || keys['w'] || keys['W']) { if (!keyHandled.up){ moveUp(); keyHandled.up = true; } }
+    else keyHandled.up = false;
+    if (keys['ArrowDown'] || keys['s'] || keys['S']) { if (!keyHandled.down){ moveDown(); keyHandled.down = true; } }
+    else keyHandled.down = false;
+  }
+
+  const keyHandled = { left:false, right:false, up:false, down:false };
+
+  function step(dt) {
+    // spawn cars per lane with timer
+    lanes.forEach((lane, idx) => {
+      if (lane.type === 'road') {
+        lane.spawnTimer -= dt;
+        if (lane.spawnTimer <= 0) {
+          spawnCar(idx);
+          lane.spawnTimer = 900 + Math.random()*1000 - idx*30; // slightly faster higher lanes
+        }
+      }
+    });
+
+    // advance cars
+    for (let i = cars.length - 1; i >= 0; i--) {
+      const c = cars[i];
+      c.x += c.dir * c.speed * (dt/16); // dt normalized to ~60fps
+      // remove offscreen cars
+      if (c.x + c.w < -50 || c.x > canvas.width + 50) cars.splice(i,1);
+    }
+
+    // collision check between player rectangle and cars on same row
+    // compute player rectangle in pixels
+    const playerX = player.col * TILE + (TILE - player.size)/2;
+    const playerY = canvas.height - ((player.row + 1) * TILE) + (TILE - player.size)/2;
+    const pW = player.size, pH = player.size;
+
+    for (const car of cars) {
+      // car lane index -> compare to player's row
+      if (car.lane === player.row) {
+        if (rectCollide(playerX, playerY, pW, pH, car.x, car.y, car.w, car.h)) {
+          // Hit!
+          gameOver = true;
+          showGameOver();
+          break;
+        }
+      }
+    }
+
+    // If player reached top row, award big score and push map upward (teleport player back to start row, increase difficulty)
+    if (player.row === 0) {
+      score += 5; // reward for crossing
+      updateScore();
+      // move player back to bottom, but increase lane speeds slightly
+      player.row = START_ROW;
+      lanes.forEach(l => { if (l.type === 'road') l.speed *= 1.06; });
+      // remove some cars to avoid instant collision
+      cars = cars.filter(c => Math.random() > 0.3);
+    }
+  }
+
+  function showGameOver() {
+    // save best
+    if (score > best) {
+      best = score;
+      localStorage.setItem('mini-crossy-best', best);
+      bestEl.textContent = 'Best: ' + best;
+    }
+    // show message on canvas (draw will handle visible text)
+    // enable restart UI
+    restartBtn.style.display = 'inline-block';
+  }
+
+  // draw everything
+  function draw() {
+    // background grass stripes
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // draw lanes bottom->top
+    for (let row = 0; row < ROWS; row++) {
+      const y = canvas.height - ((row + 1) * TILE);
+      const lane = lanes[row];
+      if (lane.type === 'safe') {
+        ctx.fillStyle = (row % 2 === 0) ? '#7ac57a' : '#6fb06f';
+        ctx.fillRect(0, y, canvas.width, TILE);
+      } else {
+        ctx.fillStyle = '#333';
+        ctx.fillRect(0, y, canvas.width, TILE);
+        // lane stripes
+        ctx.fillStyle = '#f6e58d';
+        for (let s = 0; s < canvas.width; s += TILE*1.2) {
+          ctx.fillRect(s + ((lane.dir>0)?(laneYOffset(row) % (TILE*1.2)):0), y + TILE*0.4, TILE*0.6, TILE*0.12);
+        }
+      }
+    }
+
+    // draw cars
+    for (const car of cars) {
+      ctx.fillStyle = car.color;
+      roundRect(ctx, car.x, car.y, car.w, car.h, 6, true, false);
+      // small window
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillRect(car.x + car.w*0.15, car.y + car.h*0.15, car.w*0.35, car.h*0.28);
+    }
+
+    // draw player (pixel-ish frog)
+    const px = player.col * TILE + (TILE - player.size)/2;
+    const py = canvas.height - ((player.row + 1) * TILE) + (TILE - player.size)/2;
+    ctx.fillStyle = '#ffdd59';
+    roundRect(ctx, px, py, player.size, player.size, 4, true, false);
+    // eyes (pixel)
+    ctx.fillStyle = '#111';
+    ctx.fillRect(px + player.size*0.15, py + player.size*0.2, player.size*0.12, player.size*0.12);
+    ctx.fillRect(px + player.size*0.55, py + player.size*0.2, player.size*0.12, player.size*0.12);
+
+    // HUD (score)
+    scoreEl.textContent = 'Score: ' + score;
+  }
+
+  // helper: small offset to animate lane stripes
+  function laneYOffset(row) {
+    return (performance.now()/6 + row*10) % (TILE*1.2);
+  }
+
+  function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    if (typeof r === 'undefined') r = 5;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+  }
+
+  // restart button
+  restartBtn.addEventListener('click', () => { restartBtn.style.display='none'; reset(); requestAnimationFrame(loop); });
+
+  // start game
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html> 
