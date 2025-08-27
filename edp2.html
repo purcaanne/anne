@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Word Checklist</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #ffe4ec;
+        color: #4a003d;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+    .box {
+        background: #ffc0cb;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(255,105,180,0.4);
+        text-align: center;
+        width: 300px;
+    }
+    input[type="text"] {
+        width: 100%;
+        padding: 5px;
+        margin-bottom: 10px;
+        background: #ffe4ec;
+        color: #4a003d;
+        border: 1px solid #ff8fb1;
+        border-radius: 5px;
+    }
+    button {
+        padding: 5px 10px;
+        background: #ff4f81;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin: 3px;
+        font-weight: bold;
+    }
+    button:hover {
+        background: #e03e6f;
+    }
+    ul {
+        list-style: none;
+        padding: 0;
+        text-align: left;
+    }
+    ul li {
+        padding: 3px 0;
+        border-bottom: 1px solid #ff8fb1;
+    }
+    input[type="checkbox"]:checked + label {
+        text-decoration: line-through;
+        color: #888;
+    }
+</style>
+</head>
+<body>
+
+<div class="box">
+    <h3>Word Checklist</h3>
+    <input type="text" id="wordInput" placeholder="Add or type word">
+    <br>
+    <button onclick="addWord()">Add</button>
+    <button onclick="checkWord()">Check</button>
+    <ul id="wordList"></ul>
+</div>
+
+<script>
+    let words = [];
+
+    function addWord() {
+        let word = document.getElementById("wordInput").value.trim();
+        if (word && !words.includes(word)) {
+            words.push(word);
+            document.getElementById("wordInput").value = "";
+            updateWordList();
+        }
+    }
+
+    function checkWord() {
+        let typed = document.getElementById("wordInput").value.trim();
+        let index = words.indexOf(typed);
+        if (index !== -1) {
+            let checkbox = document.getElementById(`word-${index}`);
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+                alert("Checked off!");
+            } else {
+                alert("Already checked!");
+            }
+        } else {
+            alert("Word not found!");
+        }
+        document.getElementById("wordInput").value = "";
+    }
+
+    function updateWordList() {
+        let list = document.getElementById("wordList");
+        list.innerHTML = "";
+        words.forEach((w, index) => {
+            let li = document.createElement("li");
+
+            let checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.id = `word-${index}`;
+            checkbox.style.marginRight = "8px";
+
+            let label = document.createElement("label");
+            label.htmlFor = `word-${index}`;
+            label.textContent = w;
+
+            li.appendChild(checkbox);
+            li.appendChild(label);
+            list.appendChild(li);
+        });
+    }
+</script>
+
+</body>
+</html>
