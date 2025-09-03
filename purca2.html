@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Personal Information Form</title>
+    <style>
+        /* Dark theme background */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121212;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #ddd;
+        }
+
+        .form-container {
+            background: #1e1e1e;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
+            width: 100%;
+            max-width: 480px;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+            color: #4dd0e1; /* cyan */
+            font-weight: 700;
+        }
+
+        label {
+            display: block;
+            font-size: 15px;
+            margin-bottom: 8px;
+            color: #90caf9; /* light blue */
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 14px 16px;
+            margin-bottom: 20px;
+            background: #2c2c2c;
+            border: 1px solid #555;
+            border-radius: 8px;
+            color: #eee;
+            font-size: 15px;
+            box-sizing: border-box;
+            transition: border-color 0.3s ease;
+            font-weight: 500;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4dd0e1;
+            background: #323232;
+            box-shadow: 0 0 6px #4dd0e1;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px 0;
+            background: #4dd0e1;
+            border: none;
+            border-radius: 10px;
+            color: #121212;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 4px 12px rgba(77, 208, 225, 0.6);
+        }
+
+        button:hover {
+            background: #39b7cb;
+            box-shadow: 0 6px 18px rgba(57, 183, 203, 0.8);
+        }
+
+        .form-footer {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #757575;
+        }
+
+        .form-footer a {
+            color: #4dd0e1;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .form-footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>Personal Information Form</h2>
+        
+        <form id="personalInfoForm">
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="name" required />
+
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required />
+
+            <label for="phone">Phone Number:</label>
+            <input type="tel" id="phone" name="phone" required />
+
+            <label for="address">Address:</label>
+            <textarea id="address" name="address" rows="4" required></textarea>
+
+            <button type="submit">Submit</button>
+        </form>
+
+        <div class="form-footer">
+            <p>Need help? <a href="mailto:support@domain.com">Contact Support</a></p>
+        </div>
+    </div>
+
+    <script>
+        const scriptURL = "https://script.google.com/macros/s/AKfycbxKX4M-ElJ-V36GKgRWPcHgRzbUwJi_iKRiUPVK1a2-jLOqwRYklGRoXUW81Rd7fFxLrw/exec"; 
+        
+        document.getElementById("personalInfoForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const formData = {
+                name: document.getElementById("name").value,
+                email: document.getElementById("email").value,
+                phone: document.getElementById("phone").value,
+                address: document.getElementById("address").value
+            };
+
+            fetch(scriptURL, {
+                method: "POST",
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.text())
+            .then(message => alert(message))
+            .catch(error => console.error("Error:", error));
+        });
+    </script>
+</body>
+</html>
